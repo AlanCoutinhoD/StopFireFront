@@ -36,6 +36,9 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(false);
   const [socket, setSocket] = useState(null);
   const [socketConnected, setSocketConnected] = useState(false);
+  // Cambiar los estados iniciales a arrays con algunos datos
+  const [temperatureData, setTemperatureData] = useState([24, 24]);
+  const [hours, setHours] = useState(['00:00', '00:01']);
 
   // Function to connect to WebSocket
   const connectWebSocket = (userId) => {
@@ -44,16 +47,33 @@ const Dashboard = () => {
       return;
     }
 
-    const ws = new WebSocket(`ws://13.219.53.231:8080`);
+    const ws = new WebSocket(`ws://localhost:8080`);
 
     ws.onopen = () => {
       console.log('Connected to WebSocket');
       setSocketConnected(true);
+      ws.send(`Client connected: ${userId}`);
     };
 
     ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-      console.log('Message received:', data);
+      const message = JSON.parse(event.data);
+      console.log('Message received:', message);
+      
+      if (message.type === 'notification') {
+        // Actualizar datos de temperatura (manteniendo el historial)
+        const newTemp = [...temperatureData];
+        newTemp.push(message.data.estado); // Agregar nueva temperatura sin borrar las anteriores
+        
+        // Actualizar horas (manteniendo el historial)
+        const newHours = [...hours];
+        const date = new Date(message.data.activacion);
+        const timeString = date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+        newHours.push(timeString); // Agregar nueva hora sin borrar las anteriores
+        
+        setTemperatureData(newTemp);
+        setHours(newHours);
+      }
+      
       fetchAlerts();
     };
 
@@ -161,15 +181,17 @@ const Dashboard = () => {
   };
 
   // Mock data para el gráfico de temperatura
-  const hours = [
-    '03:45 a.m.', '05:45 a.m.', '07:45 a.m.', '09:45 a.m.', '11:45 a.m.',
-    '01:45 p.m.', '03:45 p.m.', '05:45 p.m.', '07:45 p.m.', '09:45 p.m.', '10:45 p.m.', '10:50 p.m.'
-  ];
+  // Remove these duplicate declarations (around line 188)
+  // const hours = [
+  //   '03:45 a.m.', '05:45 a.m.', '07:45 a.m.', '09:45 a.m.', '11:45 a.m.',
+  //   '01:45 p.m.', '03:45 p.m.', '05:45 p.m.', '07:45 p.m.', '09:45 p.m.', '10:45 p.m.', '10:50 p.m.'
+  // ];
+  // 
+  // const temperatureData = [
+  //   24, 22, 23, 21, 22, 24, 26, 28, 29, 27, 25, 24
+  // ];
   
-  const temperatureData = [
-    24, 22, 23, 21, 22, 24, 26, 28, 29, 27, 25, 24
-  ];
-
+  // Update the chartData to use the state variables
   const chartData = {
     labels: hours,
     datasets: [
@@ -189,7 +211,8 @@ const Dashboard = () => {
     maintainAspectRatio: false,
     plugins: {
       legend: {
-        display: false,
+        display: true,  // Mostrar leyenda
+        position: 'top',
       },
       tooltip: {
         mode: 'index',
@@ -198,10 +221,8 @@ const Dashboard = () => {
     },
     scales: {
       y: {
-        min: 20,
-        max: 30,
+        // Quitar los valores fijos min/max para que se ajusten automáticamente
         ticks: {
-          stepSize: 5,
           callback: function(value) {
             return value + '°C';
           }
@@ -570,7 +591,8 @@ const ChartSubtitle = styled.p`
 `;
 
 const ChartWrapper = styled.div`
-  height: 300px;
+  height: 400px;  // Aumentar la altura
+  min-width: 600px;  // Añadir ancho mínimo
 `;
 
 // Icons
