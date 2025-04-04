@@ -42,7 +42,7 @@ const RegisterPage = () => {
       };
 
 
-      const response = await fetch('http://localhost:8080/api/users/register', {
+      const response = await fetch('http://54.208.102.30:8080/api/users/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
