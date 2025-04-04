@@ -34,24 +34,65 @@ const Dashboard = () => {
   const [activeTab, setActiveTab] = useState('Temperatura');
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [socket, setSocket] = useState(null);
+  const [socketConnected, setSocketConnected] = useState(false);
 
-  // Cargar datos del usuario al montar el componente
+  // Function to connect to WebSocket
+  const connectWebSocket = (userId) => {
+    if (socket) {
+      console.log('WebSocket already connected');
+      return;
+    }
+
+    const ws = new WebSocket(`ws://13.219.53.231:8080`);
+
+    ws.onopen = () => {
+      console.log('Connected to WebSocket');
+      setSocketConnected(true);
+    };
+
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      console.log('Message received:', data);
+      fetchAlerts();
+    };
+
+    ws.onclose = () => {
+      console.log('Disconnected from WebSocket');
+      setSocketConnected(false);
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      setSocketConnected(false);
+    };
+
+    setSocket(ws);
+  };
+
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (!token) {
-      // Si no hay token, redirigir al login
       navigate('/login');
       return;
     }
 
-    // Obtener datos del usuario del localStorage
     const username = localStorage.getItem('username');
     const email = localStorage.getItem('email');
     const userId = localStorage.getItem('userId');
     
     if (username && email) {
       setUserData({ username, email, userId });
+      // Initiate WebSocket connection
+      connectWebSocket(userId);
     }
+
+    // Clean up WebSocket connection when component unmounts
+    return () => {
+      if (socket) {
+        socket.close();
+      }
+    };
   }, [navigate]);
 
   // Función para obtener alertas
