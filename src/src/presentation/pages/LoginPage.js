@@ -61,7 +61,7 @@ const LoginPage = () => {
       localStorage.setItem('token', data.token);
       localStorage.setItem('username', data.user.username);
       localStorage.setItem('email', data.user.email);
-      localStorage.setItem('userId', data.user.id);
+      localStorage.setItem('userId', data.user.id.toString()); // Asegurarse de guardar el ID como string
       
       // También guardar el objeto user completo para tener todos los datos
       localStorage.setItem('user', JSON.stringify(data.user));

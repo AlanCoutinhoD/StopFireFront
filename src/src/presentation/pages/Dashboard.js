@@ -28,8 +28,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [userData, setUserData] = useState({
     username: '',
-    email: ''
+    email: '',
+    userId: ''
   });
+  const [activeTab, setActiveTab] = useState('Temperatura');
+  const [alerts, setAlerts] = useState([]);
+  const [loading, setLoading] = useState(false);
 
   // Cargar datos del usuario al montar el componente
   useEffect(() => {
@@ -43,11 +47,67 @@ const Dashboard = () => {
     // Obtener datos del usuario del localStorage
     const username = localStorage.getItem('username');
     const email = localStorage.getItem('email');
+    const userId = localStorage.getItem('userId');
     
     if (username && email) {
-      setUserData({ username, email });
+      setUserData({ username, email, userId });
     }
   }, [navigate]);
+
+  // Función para obtener alertas
+  const fetchAlerts = async () => {
+    setLoading(true);
+    try {
+      const userId = localStorage.getItem('userId');
+      if (!userId) {
+        console.error('No se encontró el ID del usuario');
+        return;
+      }
+
+      const response = await fetch(`http://52.7.34.158:8080/api/alerts?user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al obtener las alertas');
+      }
+
+      const data = await response.json();
+      
+      // Procesar las alertas para mostrarlas
+      const processedAlerts = [];
+      
+      if (data.alerts && data.alerts.DHT_22) {
+        data.alerts.DHT_22.forEach(alert => {
+          processedAlerts.push({
+            id: alert.id,
+            estado: alert.estado,
+            fecha_activacion: alert.fecha_activacion,
+            fecha_desactivacion: alert.fecha_desactivacion,
+            numero_serie: alert.numero_serie
+          });
+        });
+      }
+      
+      setAlerts(processedAlerts);
+    } catch (error) {
+      console.error('Error al obtener alertas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Cambiar de pestaña y cargar alertas si es necesario
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'Alertas Recientes' && alerts.length === 0) {
+      fetchAlerts();
+    }
+  };
 
   // Función para cerrar sesión
   const handleLogout = () => {
@@ -126,7 +186,7 @@ const Dashboard = () => {
     },
   };
 
-  const [activeTab, setActiveTab] = useState('Temperatura');
+ 
 
   return (
     <DashboardContainer>
@@ -209,27 +269,69 @@ const Dashboard = () => {
         <TabsContainer>
           <Tab 
             active={activeTab === 'Temperatura'} 
-            onClick={() => setActiveTab('Temperatura')}
+            onClick={() => handleTabChange('Temperatura')}
           >
             Temperatura
           </Tab>
           <Tab 
             active={activeTab === 'Alertas Recientes'} 
-            onClick={() => setActiveTab('Alertas Recientes')}
+            onClick={() => handleTabChange('Alertas Recientes')}
           >
             Alertas Recientes
           </Tab>
         </TabsContainer>
 
-        <ChartContainer>
-          <ChartHeader>
-            <ChartTitle>Historial de Temperatura</ChartTitle>
-            <ChartSubtitle>Lecturas de temperatura durante las últimas 24 horas</ChartSubtitle>
-          </ChartHeader>
-          <ChartWrapper>
-            <Line data={chartData} options={chartOptions} />
-          </ChartWrapper>
-        </ChartContainer>
+        {activeTab === 'Temperatura' ? (
+          <ChartContainer>
+            <ChartHeader>
+              <ChartTitle>Historial de Temperatura</ChartTitle>
+              <ChartSubtitle>Lecturas de temperatura durante las últimas 24 horas</ChartSubtitle>
+            </ChartHeader>
+            <ChartWrapper>
+              <Line data={chartData} options={chartOptions} />
+            </ChartWrapper>
+          </ChartContainer>
+        ) : (
+          <AlertsContainer>
+            <ChartHeader>
+              <ChartTitle>Alertas Recientes</ChartTitle>
+              <ChartSubtitle>Últimas alertas registradas por tus dispositivos</ChartSubtitle>
+            </ChartHeader>
+            
+            {loading ? (
+              <LoadingMessage>Cargando alertas...</LoadingMessage>
+            ) : alerts.length > 0 ? (
+              <AlertsList>
+                {alerts.map(alert => (
+                  <AlertItem key={alert.id}>
+                    <AlertHeader>
+                      <AlertTitle>Alerta #{alert.id}</AlertTitle>
+                      <AlertStatus estado={alert.estado}>
+                        {alert.estado > 30 ? 'Temperatura Alta' : 'Normal'}
+                      </AlertStatus>
+                    </AlertHeader>
+                    <AlertDetails>
+                      <AlertDetail>
+                        <AlertDetailLabel>Dispositivo:</AlertDetailLabel>
+                        <AlertDetailValue>{alert.numero_serie}</AlertDetailValue>
+                      </AlertDetail>
+                      <AlertDetail>
+                        <AlertDetailLabel>Temperatura:</AlertDetailLabel>
+                        <AlertDetailValue>{alert.estado}°C</AlertDetailValue>
+                      </AlertDetail>
+                      <AlertDetail>
+                        <AlertDetailLabel>Fecha:</AlertDetailLabel>
+                        <AlertDetailValue>{alert.fecha_activacion}</AlertDetailValue>
+                      </AlertDetail>
+                    </AlertDetails>
+                  </AlertItem>
+                ))}
+              </AlertsList>
+            ) : (
+              <NoAlertsMessage>No hay alertas recientes</NoAlertsMessage>
+            )}
+          </AlertsContainer>
+        )}
       </MainContent>
     </DashboardContainer>
   );
@@ -478,5 +580,83 @@ const StatusIcon = ({ positive }) => (
     <circle cx="12" cy="12" r="8" />
   </svg>
 );
+
+// Nuevos Styled Components para las alertas
+const AlertsContainer = styled.div`
+  background-color: white;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid #eaeaea;
+`;
+
+const AlertsList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+`;
+
+const AlertItem = styled.div`
+  border: 1px solid #eaeaea;
+  border-radius: 6px;
+  padding: 15px;
+  background-color: #fafafa;
+`;
+
+const AlertHeader = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+`;
+
+const AlertTitle = styled.h4`
+  margin: 0;
+  font-size: 16px;
+  font-weight: 500;
+`;
+
+const AlertStatus = styled.span`
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  background-color: ${props => props.estado > 30 ? '#ffebee' : '#e8f5e9'};
+  color: ${props => props.estado > 30 ? '#c62828' : '#2e7d32'};
+`;
+
+const AlertDetails = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`;
+
+const AlertDetail = styled.div`
+  display: flex;
+  font-size: 14px;
+`;
+
+const AlertDetailLabel = styled.span`
+  font-weight: 500;
+  width: 100px;
+  color: #666;
+`;
+
+const AlertDetailValue = styled.span`
+  color: #333;
+`;
+
+const LoadingMessage = styled.div`
+  text-align: center;
+  padding: 20px;
+  color: #666;
+`;
+
+const NoAlertsMessage = styled.div`
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+`;
 
 export default Dashboard;
