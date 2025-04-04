@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import styled from 'styled-components';
 import { Line } from 'react-chartjs-2';
+import { useNavigate } from 'react-router-dom';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -24,7 +25,41 @@ ChartJS.register(
 );
 
 const Dashboard = () => {
-  // Mock data for the temperature chart
+  const navigate = useNavigate();
+  const [userData, setUserData] = useState({
+    username: '',
+    email: ''
+  });
+
+  // Cargar datos del usuario al montar el componente
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      // Si no hay token, redirigir al login
+      navigate('/login');
+      return;
+    }
+
+    // Obtener datos del usuario del localStorage
+    const username = localStorage.getItem('username');
+    const email = localStorage.getItem('email');
+    
+    if (username && email) {
+      setUserData({ username, email });
+    }
+  }, [navigate]);
+
+  // Función para cerrar sesión
+  const handleLogout = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('username');
+    localStorage.removeItem('email');
+    localStorage.removeItem('userId');
+    localStorage.removeItem('user');
+    navigate('/login');
+  };
+
+  // Mock data para el gráfico de temperatura
   const hours = [
     '03:45 a.m.', '05:45 a.m.', '07:45 a.m.', '09:45 a.m.', '11:45 a.m.',
     '01:45 p.m.', '03:45 p.m.', '05:45 p.m.', '07:45 p.m.', '09:45 p.m.', '10:45 p.m.', '10:50 p.m.'
@@ -125,12 +160,12 @@ const Dashboard = () => {
         </NavItems>
 
         <UserInfo>
-          <UserInitials>JD</UserInitials>
+          <UserInitials>{userData.username ? userData.username.substring(0, 2).toUpperCase() : 'US'}</UserInitials>
           <UserDetails>
-            <UserName>Juan Pérez</UserName>
-            <UserEmail>juan@ejemplo.com</UserEmail>
+            <UserName>{userData.username || 'Usuario'}</UserName>
+            <UserEmail>{userData.email || 'correo@ejemplo.com'}</UserEmail>
           </UserDetails>
-          <LogoutButton>
+          <LogoutButton onClick={handleLogout}>
             <LogoutIcon />
           </LogoutButton>
         </UserInfo>

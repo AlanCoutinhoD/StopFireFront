@@ -1,60 +1,132 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import FireLogo from '../../assets/fire-logo.svg';
 
 const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    password: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    // Login logic would go here
-    console.log('Login attempt with:', { email, password });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      // Preparar los datos para enviar al backend
+      const loginData = {
+        email: formData.username, // Usando el campo username como email
+        password: formData.password
+      };
+
+      const response = await fetch('http://localhost:8080/api/users/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(loginData),
+        mode: 'cors',
+        cache: 'no-cache',
+        credentials: 'same-origin',
+      });
+
+      // Verificar si la respuesta es JSON
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al iniciar sesión');
+      }
+
+      // Guardar token y datos del usuario en localStorage
+      localStorage.setItem('token', data.token);
+      localStorage.setItem('username', data.user.username);
+      localStorage.setItem('email', data.user.email);
+      localStorage.setItem('userId', data.user.id);
+      
+      // También guardar el objeto user completo para tener todos los datos
+      localStorage.setItem('user', JSON.stringify(data.user));
+
+      // Redirigir al dashboard
+      navigate('/dashboard');
+    } catch (error) {
+      console.error('Error de login:', error);
+      setError(error.message || 'Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Resto del componente permanece igual
   return (
     <LoginContainer>
       <LoginCard>
         <LogoContainer>
-          <Logo src={FireLogo} alt="FireGuard Logo" />
+          <Logo />
+          <LogoText>FireGuard</LogoText>
         </LogoContainer>
-        <LoginTitle>Login to FireGuard</LoginTitle>
-        <LoginSubtitle>Enter your email and password to access your dashboard</LoginSubtitle>
         
-        <LoginForm onSubmit={handleSubmit}>
+        <Title>Iniciar Sesión</Title>
+        <Subtitle>Ingresa tus credenciales para acceder a tu cuenta</Subtitle>
+        
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        
+        <Form onSubmit={handleSubmit}>
           <FormGroup>
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              type="email" 
-              id="email" 
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <Label htmlFor="username">Correo Electrónico</Label>
+            <Input
+              type="text"
+              id="username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
               required
+              placeholder="Ingresa tu correo electrónico"
             />
           </FormGroup>
           
           <FormGroup>
-            <PasswordContainer>
-              <Label htmlFor="password">Password</Label>
-              <ForgotPassword to="/forgot-password">Forgot password?</ForgotPassword>
-            </PasswordContainer>
-            <Input 
-              type="password" 
-              id="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
               required
+              placeholder="Ingresa tu contraseña"
             />
           </FormGroup>
           
-          <LoginButton type="submit">Login</LoginButton>
-        </LoginForm>
+          <ForgotPassword to="/forgot-password">¿Olvidaste tu contraseña?</ForgotPassword>
+          
+          <SubmitButton type="submit" disabled={loading}>
+            {loading ? 'Iniciando sesión...' : 'Iniciar Sesión'}
+          </SubmitButton>
+        </Form>
         
-        <SignupPrompt>
-          Don't have an account? <RegisterLink to="/register">Register</RegisterLink>
-        </SignupPrompt>
+        <RegisterPrompt>
+          ¿No tienes una cuenta? <RegisterLink to="/register">Regístrate</RegisterLink>
+        </RegisterPrompt>
       </LoginCard>
     </LoginContainer>
   );
@@ -67,12 +139,12 @@ const LoginContainer = styled.div`
   align-items: center;
   min-height: 100vh;
   background-color: #f5f5f5;
-  font-family: 'Arial', sans-serif;
+  padding: 20px;
 `;
 
 const LoginCard = styled.div`
-  background: white;
-  border-radius: 8px;
+  background-color: white;
+  border-radius: 10px;
   padding: 40px;
   width: 100%;
   max-width: 450px;
@@ -81,50 +153,61 @@ const LoginCard = styled.div`
 
 const LogoContainer = styled.div`
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
-`;
-
-const Logo = styled.img`
-  height: 40px;
-  color: #e52e2e;
-`;
-
-const LoginTitle = styled.h1`
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 10px;
-`;
-
-const LoginSubtitle = styled.p`
-  font-size: 16px;
-  color: #666;
-  text-align: center;
   margin-bottom: 30px;
 `;
 
-const LoginForm = styled.form`
+const Logo = styled.div`
+  width: 30px;
+  height: 30px;
+  background-color: #e52e2e;
+  border-radius: 50%;
+  margin-right: 10px;
+`;
+
+const LogoText = styled.h1`
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: #333;
+`;
+
+const Title = styled.h2`
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  text-align: center;
+`;
+
+const Subtitle = styled.p`
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 30px 0;
+  text-align: center;
+`;
+
+const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 20px;
 `;
 
 const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-bottom: 20px;
 `;
 
 const Label = styled.label`
+  display: block;
+  margin-bottom: 8px;
   font-weight: 500;
-  font-size: 16px;
+  color: #333;
 `;
 
 const Input = styled.input`
+  width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 16px;
   
   &:focus {
@@ -133,41 +216,51 @@ const Input = styled.input`
   }
 `;
 
-const PasswordContainer = styled.div`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-`;
-
 const ForgotPassword = styled(Link)`
+  align-self: flex-end;
+  font-size: 14px;
   color: #e52e2e;
   text-decoration: none;
-  font-size: 14px;
+  margin-bottom: 20px;
   
   &:hover {
     text-decoration: underline;
   }
 `;
 
-const LoginButton = styled.button`
+const SubmitButton = styled.button`
   background-color: #e52e2e;
   color: white;
-  padding: 12px;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
+  padding: 12px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  margin-top: 10px;
+  transition: background-color 0.2s;
   
   &:hover {
     background-color: #d42020;
   }
+  
+  &:disabled {
+    background-color: #e57f7f;
+    cursor: not-allowed;
+  }
 `;
 
-const SignupPrompt = styled.p`
+const ErrorMessage = styled.div`
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  font-size: 14px;
+`;
+
+const RegisterPrompt = styled.p`
   text-align: center;
-  margin-top: 20px;
+  margin-top: 30px;
   font-size: 14px;
   color: #666;
 `;

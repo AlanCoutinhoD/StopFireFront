@@ -1,81 +1,158 @@
 import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import styled from 'styled-components';
-import FireLogo from '../../assets/fire-logo.svg';
 
 const RegisterPage = () => {
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
+  const [formData, setFormData] = useState({
+    username: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e) => {
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prevState => ({
+      ...prevState,
+      [name]: value
+    }));
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    // Registration logic would go here
-    console.log('Registration attempt with:', { fullName, email, password, confirmPassword });
+    setError('');
+
+    // Validar que las contraseñas coincidan
+    if (formData.password !== formData.confirmPassword) {
+      setError('Las contraseñas no coinciden');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Preparar los datos para enviar al backend
+      const userData = {
+        username: formData.username,
+        email: formData.email,
+        password: formData.password
+      };
+
+
+      const response = await fetch('http://localhost:8080/api/users/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify(userData),
+        mode: 'cors',
+        cache: 'no-cache',
+        credentials: 'same-origin',
+      });
+
+      // Verificar si la respuesta es JSON
+      const contentType = response.headers.get('content-type');
+      let data;
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json();
+      } else {
+        data = { message: await response.text() };
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Error al registrar usuario');
+      }
+
+      // Si el registro es exitoso (status 201), redirigir al login
+      if (response.status === 201) {
+        navigate('/login');
+      }
+    } catch (error) {
+      console.error('Error de registro:', error);
+      setError(error.message || 'Error al conectar con el servidor');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
     <RegisterContainer>
       <RegisterCard>
         <LogoContainer>
-          <Logo src={FireLogo} alt="FireGuard Logo" />
+          <Logo />
+          <LogoText>FireGuard</LogoText>
         </LogoContainer>
-        <RegisterTitle>Create an account</RegisterTitle>
-        <RegisterSubtitle>Enter your information to create a FireGuard account</RegisterSubtitle>
         
-        <RegisterForm onSubmit={handleSubmit}>
+        <Title>Crear Cuenta</Title>
+        <Subtitle>Regístrate para comenzar a proteger tu propiedad</Subtitle>
+        
+        {error && <ErrorMessage>{error}</ErrorMessage>}
+        
+        <Form onSubmit={handleSubmit}>
           <FormGroup>
-            <Label htmlFor="fullName">Full Name</Label>
-            <Input 
-              type="text" 
-              id="fullName" 
-              placeholder="John Doe"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
+            <Label htmlFor="username">Nombre de Usuario</Label>
+            <Input
+              type="text"
+              id="username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
               required
+              placeholder="Elige un nombre de usuario"
             />
           </FormGroup>
           
           <FormGroup>
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              type="email" 
-              id="email" 
-              placeholder="name@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+            <Label htmlFor="email">Correo Electrónico</Label>
+            <Input
+              type="email"
+              id="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
               required
+              placeholder="Ingresa tu correo electrónico"
             />
           </FormGroup>
           
           <FormGroup>
-            <Label htmlFor="password">Password</Label>
-            <Input 
-              type="password" 
-              id="password" 
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
+            <Label htmlFor="password">Contraseña</Label>
+            <Input
+              type="password"
+              id="password"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
               required
+              placeholder="Crea una contraseña segura"
             />
           </FormGroup>
           
           <FormGroup>
-            <Label htmlFor="confirmPassword">Confirm Password</Label>
-            <Input 
-              type="password" 
-              id="confirmPassword" 
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+            <Label htmlFor="confirmPassword">Confirmar Contraseña</Label>
+            <Input
+              type="password"
+              id="confirmPassword"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
               required
+              placeholder="Confirma tu contraseña"
             />
           </FormGroup>
           
-          <RegisterButton type="submit">Register</RegisterButton>
-        </RegisterForm>
+          <SubmitButton type="submit" disabled={loading}>
+            {loading ? 'Registrando...' : 'Registrarse'}
+          </SubmitButton>
+        </Form>
         
         <LoginPrompt>
-          Already have an account? <LoginLink to="/login">Login</LoginLink>
+          ¿Ya tienes una cuenta? <LoginLink to="/login">Inicia Sesión</LoginLink>
         </LoginPrompt>
       </RegisterCard>
     </RegisterContainer>
@@ -89,12 +166,12 @@ const RegisterContainer = styled.div`
   align-items: center;
   min-height: 100vh;
   background-color: #f5f5f5;
-  font-family: 'Arial', sans-serif;
+  padding: 20px;
 `;
 
 const RegisterCard = styled.div`
-  background: white;
-  border-radius: 8px;
+  background-color: white;
+  border-radius: 10px;
   padding: 40px;
   width: 100%;
   max-width: 450px;
@@ -103,50 +180,61 @@ const RegisterCard = styled.div`
 
 const LogoContainer = styled.div`
   display: flex;
+  align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
-`;
-
-const Logo = styled.img`
-  height: 40px;
-  color: #e52e2e;
-`;
-
-const RegisterTitle = styled.h1`
-  font-size: 24px;
-  font-weight: bold;
-  text-align: center;
-  margin-bottom: 10px;
-`;
-
-const RegisterSubtitle = styled.p`
-  font-size: 16px;
-  color: #666;
-  text-align: center;
   margin-bottom: 30px;
 `;
 
-const RegisterForm = styled.form`
+const Logo = styled.div`
+  width: 30px;
+  height: 30px;
+  background-color: #e52e2e;
+  border-radius: 50%;
+  margin-right: 10px;
+`;
+
+const LogoText = styled.h1`
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0;
+  color: #333;
+`;
+
+const Title = styled.h2`
+  font-size: 24px;
+  font-weight: bold;
+  margin: 0 0 10px 0;
+  text-align: center;
+`;
+
+const Subtitle = styled.p`
+  font-size: 16px;
+  color: #666;
+  margin: 0 0 30px 0;
+  text-align: center;
+`;
+
+const Form = styled.form`
   display: flex;
   flex-direction: column;
-  gap: 20px;
 `;
 
 const FormGroup = styled.div`
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  margin-bottom: 20px;
 `;
 
 const Label = styled.label`
+  display: block;
+  margin-bottom: 8px;
   font-weight: 500;
-  font-size: 16px;
+  color: #333;
 `;
 
 const Input = styled.input`
+  width: 100%;
   padding: 12px;
   border: 1px solid #ddd;
-  border-radius: 4px;
+  border-radius: 5px;
   font-size: 16px;
   
   &:focus {
@@ -155,25 +243,39 @@ const Input = styled.input`
   }
 `;
 
-const RegisterButton = styled.button`
+const SubmitButton = styled.button`
   background-color: #e52e2e;
   color: white;
-  padding: 12px;
   border: none;
-  border-radius: 4px;
+  border-radius: 5px;
+  padding: 12px;
   font-size: 16px;
   font-weight: 500;
   cursor: pointer;
-  margin-top: 10px;
+  transition: background-color 0.2s;
   
   &:hover {
     background-color: #d42020;
   }
+  
+  &:disabled {
+    background-color: #e57f7f;
+    cursor: not-allowed;
+  }
+`;
+
+const ErrorMessage = styled.div`
+  background-color: #ffebee;
+  color: #c62828;
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 20px;
+  font-size: 14px;
 `;
 
 const LoginPrompt = styled.p`
   text-align: center;
-  margin-top: 20px;
+  margin-top: 30px;
   font-size: 14px;
   color: #666;
 `;
